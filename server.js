@@ -1,19 +1,76 @@
-app.use(cors());
-// ===== Static & middleware =====
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/admin", express.static(path.join(__dirname, "admin")));
+// server.js
+import express from "express";
+import cors from "cors";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import { nanoid } from "nanoid";
+import dotenv from "dotenv";
+import multer from "multer";
+import webpush from "web-push";
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "changeme";
+
+const BANK_NAME = process.env.BANK_NAME || "BVBank";
+const BANK_ACCOUNT_NAME = process.env.BANK_ACCOUNT_NAME || "TRUONG LUU QUAN";
+const BANK_ACCOUNT_NUMBER = process.env.BANK_ACCOUNT_NUMBER || "0336440523";
+const VIETQR_IMAGE = process.env.VIETQR_IMAGE || "/img/vietqr.png";
+
+const VAPID_PUBLIC = process.env.VAPID_PUBLIC || "";
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE || "";
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+
+// ====== File locations (free tier friendly) ======
+// - Nếu có ENV thì dùng ENV
+// - Nếu chạy trên Render free (process.env.RENDER) mà không set ENV -> dùng /tmp (ghi được)
+// - Khi chạy local -> dùng file trong thư mục dự án
+const DB_FILE =
+  process.env.DATA_FILE ||
+  (process.env.RENDER ? "/tmp/db.json" : path.join(__dirname, "db.json"));
 
 const UPLOAD_DIR =
   process.env.UPLOAD_DIR ||
   (process.env.RENDER
     ? "/tmp/uploads"
     : path.join(__dirname, "public", "uploads"));
+
+console.log("[BOOT] DB_FILE   =", DB_FILE);
+console.log("[BOOT] UPLOAD_DIR=", UPLOAD_DIR);
+
+// ====== Web Push (optional) ======
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  console.log("Web Push: VAPID configured");
+} else {
+  console.warn("Web Push: VAPID_PUBLIC/PRIVATE not set — push disabled");
+}
+
+// ====== Middleware & static ======
+app.use(cors());
+app.use(express.json());
+
+// Phục vụ static từ /public (nếu có)
+app.use(express.static(path.join(__dirname, "public")));
+
+// Phục vụ file tĩnh ở root repo (để menu.html, products.html... ở gốc vẫn truy cập được)
+app.use(express.static(__dirname));
+
+// Phục vụ /admin nếu có thư mục admin/
+app.use("/admin", express.static(path.join(__dirname, "admin")));
+
+// Tạo thư mục upload & mapping static
 await fs.mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-// Multer
+// ====== Multer upload ======
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
   filename: (_req, file, cb) => {
@@ -32,7 +89,26 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ===== Helpers =====
+// ====== Helpers ======
+async function ensureDbFile() {
+  try {
+    await fs.access(DB_FILE);
+  } catch {
+    const init = {
+      products: [],
+      orders: [],
+      settings: {
+        promo: { enabled: false, percent: 0, start: null, end: null },
+        push: { subscriptions: [] },
+      },
+    };
+    await fs
+      .writeFile(DB_FILE, JSON.stringify(init, null, 2), "utf-8")
+      .catch(() => {});
+  }
+}
+await ensureDbFile();
+
 async function readDB() {
   try {
     const raw = await fs.readFile(DB_FILE, "utf-8");
@@ -95,9 +171,9 @@ function dstr(d) {
 }
 function sameId(a, b) {
   return String(a || "").toUpperCase() === String(b || "").toUpperCase();
-} // <— so khớp id KHÔNG phân biệt hoa/thường
+}
 
-// ===== Auth =====
+// ====== Auth ======
 function requireAdmin(req, res, next) {
   const t = req.headers["x-admin-token"];
   if (!t || t !== ADMIN_TOKEN)
@@ -110,7 +186,7 @@ app.post("/api/auth/login", (req, res) => {
   res.status(401).json({ error: "Sai mật khẩu" });
 });
 
-// ===== Upload =====
+// ====== Upload ======
 app.post("/api/upload", requireAdmin, upload.single("file"), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file" });
@@ -120,7 +196,7 @@ app.post("/api/upload", requireAdmin, upload.single("file"), (req, res) => {
   }
 });
 
-// ===== Settings =====
+// ====== Settings ======
 app.get("/api/settings", requireAdmin, async (_req, res) => {
   const db = await readDB();
   res.json(db.settings);
@@ -140,7 +216,7 @@ app.put("/api/settings", requireAdmin, async (req, res) => {
   res.json(db.settings);
 });
 
-// ===== Config (public) =====
+// ====== Config (public) ======
 app.get("/api/config", async (_req, res) => {
   const db = await readDB();
   res.json({
@@ -158,7 +234,7 @@ app.get("/api/config", async (_req, res) => {
   });
 });
 
-// ===== Products =====
+// ====== Products ======
 app.get("/api/products", async (_req, res) => {
   const db = await readDB();
   res.json(db.products.filter((p) => p.active !== false));
@@ -230,11 +306,11 @@ app.delete("/api/products/:id", requireAdmin, async (req, res) => {
   res.json(removed);
 });
 
-// ===== Orders =====
+// ====== Orders ======
 const AllowedStatus = ["NEW", "IN_PROGRESS", "COMPLETED", "CANCELED"];
 const AllowedOrderTypes = ["TAKEAWAY", "TAKE_AWAY", "DINE_IN", "RESERVE"];
 
-// ---- Web Push helpers ----
+// Web Push helpers
 async function addPushSubscription(sub) {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return; // disabled
   const db = await readDB();
@@ -262,11 +338,9 @@ async function sendPushToAll(payload) {
       try {
         await webpush.sendNotification(sub, JSON.stringify(payload));
       } catch (e) {
-        if (e?.statusCode === 404 || e?.statusCode === 410) {
+        if (e?.statusCode === 404 || e?.statusCode === 410)
           dead.push(sub?.endpoint);
-        } else {
-          console.warn("Push error:", e?.statusCode, e?.message);
-        }
+        else console.warn("Push error:", e?.statusCode, e?.message);
       }
     })
   );
@@ -278,7 +352,7 @@ async function sendPushToAll(payload) {
   }
 }
 
-// ---- Push routes ----
+// Push routes
 app.get("/api/push/publicKey", requireAdmin, (_req, res) => {
   res.json({ publicKey: VAPID_PUBLIC || "" });
 });
@@ -310,35 +384,29 @@ app.post("/api/push/test", requireAdmin, async (_req, res) => {
   res.json({ ok: true });
 });
 
-// ==== SSE: stream đơn mới cho trang admin (auth qua query token) ====
+// SSE stream for admin
 const sseClients = new Set();
-
 app.get("/api/orders/stream", (req, res) => {
   const qtoken = req.query.token;
   if (!qtoken || qtoken !== ADMIN_TOKEN) return res.sendStatus(401);
-
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
   });
   res.write(`event: ping\ndata: ${Date.now()}\n\n`);
-
   const client = { res };
   sseClients.add(client);
-
   const keep = setInterval(() => {
     try {
       res.write(`event: ping\ndata: ${Date.now()}\n\n`);
     } catch {}
   }, 25000);
-
   req.on("close", () => {
     clearInterval(keep);
     sseClients.delete(client);
   });
 });
-
 function sseBroadcast(data) {
   const payload = `data: ${JSON.stringify(data)}\n\n`;
   for (const { res } of sseClients) {
@@ -348,7 +416,7 @@ function sseBroadcast(data) {
   }
 }
 
-// ===== Create Order =====
+// Create Order
 app.post("/api/orders", async (req, res) => {
   const { customer, items, paymentMethod, meta } = req.body || {};
   if (
@@ -433,7 +501,7 @@ app.post("/api/orders", async (req, res) => {
   // Realtime cho trang admin
   sseBroadcast({ type: "new_order", order });
 
-  // Gửi push (không chặn phản hồi nếu lỗi)
+  // Web push (best-effort)
   (async () => {
     try {
       const totalVnd = (order.total || 0).toLocaleString("vi-VN") + "₫";
@@ -461,7 +529,7 @@ app.post("/api/orders", async (req, res) => {
   });
 });
 
-// ===== Query Orders =====
+// Query Orders
 app.get("/api/orders", requireAdmin, async (req, res) => {
   const { status, page = 1, pageSize = 10 } = req.query;
   const db = await readDB();
@@ -482,7 +550,7 @@ app.get("/api/orders", requireAdmin, async (req, res) => {
   });
 });
 
-// ===== Update/Delete/Tracking/Reports (giữ nguyên) =====
+// Update/Delete/Tracking/Reports
 app.put("/api/orders/:id", requireAdmin, async (req, res) => {
   const { status } = req.body || {};
   if (status && !AllowedStatus.includes(status))
@@ -517,7 +585,7 @@ app.get("/api/orders/public/:id", async (req, res) => {
     status: o.status,
     total: o.total,
     discount: o.discount || 0,
-    subtotal: o.subtotal || o.total,
+    subtotal: o.subtotal ?? o.total,
     paymentMethod: o.paymentMethod,
     createdAt: o.createdAt,
     customer: {
@@ -595,6 +663,7 @@ app.get("/api/reports/daily", requireAdmin, async (req, res) => {
     .map((k) => ({ date: k, ...map.get(k) }));
   res.json({ items });
 });
+
 app.get("/api/reports/monthly", requireAdmin, async (req, res) => {
   const year = parseInt(req.query.year || String(new Date().getFullYear()), 10);
   const db = await readDB();
@@ -617,6 +686,7 @@ app.get("/api/reports/monthly", requireAdmin, async (req, res) => {
   });
   res.json({ year, items: sums.map((s, i) => ({ month: i + 1, ...s })) });
 });
+
 app.get("/api/reports/yearly", requireAdmin, async (_req, res) => {
   const db = await readDB();
   const byYear = new Map();
