@@ -36,15 +36,30 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
   console.warn("Web Push: VAPID_PUBLIC/PRIVATE not set — push disabled");
 }
 
-const DB_FILE = process.env.DATA_FILE || path.join("/data", "db.json");
+const DB_FILE =
+  process.env.DATA_FILE ||
+  (process.env.RENDER ? "/tmp/db.json" : path.join(__dirname, "db.json"));
+console.log("[BOOT] DB_FILE =", DB_FILE);
+console.log("[BOOT] UPLOAD_DIR =", UPLOAD_DIR);
 
+// Cấu hình web-push (nếu có key)
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  console.log("Web Push: VAPID configured");
+} else {
+  console.warn("Web Push: VAPID_PUBLIC/PRIVATE not set — push disabled");
+}
 // ===== Static & middleware =====
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/admin", express.static(path.join(__dirname, "admin")));
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join("/data", "uploads");
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR ||
+  (process.env.RENDER
+    ? "/tmp/uploads"
+    : path.join(__dirname, "public", "uploads"));
 await fs.mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
 app.use("/uploads", express.static(UPLOAD_DIR));
 
