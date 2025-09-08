@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: nhi-nhi-quan
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "node server.js"
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_PASSWORD
+        value: admin123 # đổi khi lên production
+      - key: ADMIN_TOKEN
+        value: change_this_please_! # đặt chuỗi ngẫu nhiên dài
+      - key: DATA_FILE
+        value: /data/db.json
+      - key: UPLOAD_DIR
+        value: /data/uploads
+      - key: BANK_NAME
+        value: BVBank
+      - key: BANK_ACCOUNT_NAME
+        value: TRUONG LUU QUAN
+      - key: BANK_ACCOUNT_NUMBER
+        value: "0336440523"
+      - key: VAPID_PUBLIC
+        value: "BJHuowv1FViPuU7iA32uI-Drb3eeADyMXE8K1Ivc2pFfnDoJaqDLPz9_AOYzjspeV4bIWeUGMwdWke8231KAA8Q" # dán key thật của bạn
+      - key: VAPID_PRIVATE
+        value: "mfFR5ednMIhHYe14_QrYUaivIQxZnWGNBnfdEHJUEIA" # dán key thật của bạn
+      - key: VAPID_SUBJECT
+        value: "mailto:you@example.com"
+    disks:
+      - name: persistent-data
+        mountPath: /data
+        sizeGB: 1

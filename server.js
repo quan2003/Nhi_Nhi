@@ -36,7 +36,7 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
   console.warn("Web Push: VAPID_PUBLIC/PRIVATE not set — push disabled");
 }
 
-const DB_FILE = path.join(__dirname, "db.json");
+const DB_FILE = process.env.DATA_FILE || path.join("/data", "db.json");
 
 // ===== Static & middleware =====
 app.use(cors());
@@ -44,7 +44,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/admin", express.static(path.join(__dirname, "admin")));
 
-const UPLOAD_DIR = path.join(__dirname, "public", "uploads");
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join("/data", "uploads");
 await fs.mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
 app.use("/uploads", express.static(UPLOAD_DIR));
 
