@@ -10,9 +10,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: ADMIN_PASSWORD
-        value: admin123 # đổi khi lên production
+        value: admin123
       - key: ADMIN_TOKEN
-        value: change_this_please_! # đặt chuỗi ngẫu nhiên dài
+        value: change_this_please_!
       - key: DATA_FILE
         value: /data/db.json
       - key: UPLOAD_DIR
@@ -24,12 +24,12 @@ services:
       - key: BANK_ACCOUNT_NUMBER
         value: "0336440523"
       - key: VAPID_PUBLIC
-        value: "BJHuowv1FViPuU7iA32uI-Drb3eeADyMXE8K1Ivc2pFfnDoJaqDLPz9_AOYzjspeV4bIWeUGMwdWke8231KAA8Q" # dán key thật của bạn
+        value: "BJHuowv1FViPuU7iA32uI-Drb3eeADyMXE8K1Ivc2pFfnDoJaqDLPz9_AOYzjspeV4bIWeUGMwdWke8231KAA8Q"
       - key: VAPID_PRIVATE
-        value: "mfFR5ednMIhHYe14_QrYUaivIQxZnWGNBnfdEHJUEIA" # dán key thật của bạn
+        value: "mfFR5ednMIhHYe14_QrYUaivIQxZnWGNBnfdEHJUEIA"
       - key: VAPID_SUBJECT
         value: "mailto:you@example.com"
-    disks:
-      - name: persistent-data
-        mountPath: /data
-        sizeGB: 1
+    disk:
+      name: persistent-data
+      mountPath: /data
+      sizeGB: 1
