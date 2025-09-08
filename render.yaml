@@ -13,10 +13,11 @@ services:
         value: admin123
       - key: ADMIN_TOKEN
         value: change_this_please_!
-      - key: DATA_FILE
-        value: /data/db.json
-      - key: UPLOAD_DIR
-        value: /data/uploads
+      # Có thể bỏ 2 biến này đi để dùng đường dẫn mặc định trong code
+      # - key: DATA_FILE
+      #   value: db.json
+      # - key: UPLOAD_DIR
+      #   value: public/uploads
       - key: BANK_NAME
         value: BVBank
       - key: BANK_ACCOUNT_NAME
@@ -29,7 +30,3 @@ services:
         value: "mfFR5ednMIhHYe14_QrYUaivIQxZnWGNBnfdEHJUEIA"
       - key: VAPID_SUBJECT
         value: "mailto:you@example.com"
-    disk:
-      name: persistent-data
-      mountPath: /data
-      sizeGB: 1
